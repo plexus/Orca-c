@@ -18,11 +18,15 @@
 #include <portmidi.h>
 #endif
 
-#ifdef FEAT_JACKMIDI
+#if defined(FEAT_JACKMIDI) || defined(FEAT_JACKTRANSPORT)
 #include <jack/jack.h>
 #include <jack/ringbuffer.h>
 #include <jack/midiport.h>
 #define JACK_RINGBUFFER_SIZE (16384) // Default size for ringbuffer
+#endif
+
+#ifdef FEAT_JACKTRANSPORT
+#include <jack/transport.h>
 #endif
 
 #if NCURSES_VERSION_PATCH < 20081122
@@ -767,7 +771,7 @@ static bool portmidi_is_initialized = false;
 #ifdef FEAT_JACKMIDI
 // TODO: Fix that assumption
 // Assumes jack always process the same numbers of frames.
-struct jack_orca_midi_event{
+struct jack_orca_midi_event {
   jack_nframes_t event_timestamp;
   unsigned char event_data[4];
 };
@@ -778,7 +782,10 @@ typedef struct {
   jack_port_t *output_port; //Put the ports in an array
   jack_ringbuffer_t *jack_rb;
 } Midi_mode_jackmidi;
+
 static bool jackmidi_is_initialized = false;
+
+static jack_position_t jack_position;
 #endif
 
 typedef union {
@@ -1981,7 +1988,16 @@ staticni void ged_input_cmd(Ged *a, Ged_input_cmd ev) {
     a->is_draw_dirty = true;
     break;
   case Ged_input_cmd_toggle_play_pause:
+#ifdef FEAT_JACKTRANSPORT
+    jack_transport_state_t transport_state = jack_transport_query(a->midi_mode.jackmidi.client, &jack_position);
+    if (JackTransportStopped == transport_state) {
+      jack_transport_start(a->midi_mode.jackmidi.client);
+    } else if (JackTransportRolling == transport_state) {
+      jack_transport_stop(a->midi_mode.jackmidi.client);
+    }
+#else
     ged_set_playing(a, !a->is_playing);
+#endif
     break;
   case Ged_input_cmd_toggle_show_event_list:
     a->draw_event_list = !a->draw_event_list;
@@ -3593,6 +3609,19 @@ event_loop:;
   }
   switch (key) {
   case ERR: { // ERR indicates no more events.
+#ifdef FEAT_JACKTRANSPORT
+    jack_transport_state_t transport_state = jack_transport_query(t.ged.midi_mode.jackmidi.client, &jack_position);
+    if (jack_position.valid & JackPositionBBT) {
+      if (jack_position.beats_per_minute > 0) {
+        t.ged.bpm = (Usz)jack_position.beats_per_minute;
+      }
+    }
+    if (JackTransportStopped == transport_state) {
+      t.ged.is_playing = false;
+    } else if (JackTransportRolling == transport_state) {
+      t.ged.is_playing = true;
+    }
+#endif
     ged_do_stuff(&t.ged);
     bool drew_any = false;
     if (ged_is_draw_dirty(&t.ged) || qnav_stack.occlusion_dirty) {

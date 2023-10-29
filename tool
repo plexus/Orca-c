@@ -18,28 +18,31 @@ Commands:
     help
         Prints this message and exits.
 Options:
-    -c <name>      Use a specific compiler binary. Default: \$CC, or cc
-    -d             Build with debug features. Output changed to:
-                   build/debug/<target>
-    --harden       Enable compiler safeguards like -fstack-protector.
-                   You should probably do this if you plan to give the
-                   compiled binary to other people.
-    --static       Build static binary.
-    --pie          Enable PIE (ASLR).
-                   Note: --pie and --static cannot be mixed.
-    -s             Print statistics about compile time and binary size.
-    -v             Print important commands as they're executed.
-    -h or --help   Print this message and exit.
+    -c <name>           Use a specific compiler binary. Default: \$CC, or cc
+    -d                  Build with debug features. Output changed to:
+                        build/debug/<target>
+    --harden            Enable compiler safeguards like -fstack-protector.
+                        You should probably do this if you plan to give the
+                        compiled binary to other people.
+    --static            Build static binary.
+    --pie               Enable PIE (ASLR).
+                        Note: --pie and --static cannot be mixed.
+    -s                  Print statistics about compile time and binary size.
+    -v                  Print important commands as they're executed.
+    -h or --help        Print this message and exit.
 Optional Features:
-    --jackmidi     Enable or disable virtual MIDI output support with
-    --no-jackmidi  JACK.
-                   Default: disabled.
-    --portmidi     Enable or disable hardware MIDI output support with
-    --no-portmidi  PortMidi. Note: PortMidi has memory leaks and bugs.
-                   Default: disabled.
-    --mouse        Enable or disable mouse features in the livecoding
-    --no-mouse     environment.
-                   Default: enabled.
+    --jackmidi          Enable or disable virtual MIDI output support with
+    --no-jackmidi       JACK.
+                        Default: disabled.
+    --jack-transport    Enable or disable Jack Transport support.
+    --no-jack-transport
+                        Default: disabled.
+    --portmidi          Enable or disable hardware MIDI output support with
+    --no-portmidi       PortMidi. Note: PortMidi has memory leaks and bugs.
+                        Default: disabled.
+    --mouse             Enable or disable mouse features in the livecoding
+    --no-mouse          environment.
+                        Default: enabled.
 EOF
 }
 
@@ -92,6 +95,7 @@ pie_enabled=0
 static_enabled=0
 portmidi_enabled=0
 jackmidi_enabled=0
+jacktransport_enabled=0
 mouse_disabled=0
 config_mode=release
 
@@ -106,6 +110,8 @@ while getopts c:dhsv-: opt_val; do
          no-portmidi|noportmidi) portmidi_enabled=0;;
          jackmidi) jackmidi_enabled=1;;
          no-jackmidi|nojackmidi) jackmidi_enabled=0;;
+         jack-transport) jacktransport_enabled=1;;
+         no-jack-transport) jacktransport_enabled=0;;
          mouse) mouse_disabled=0;;
          no-mouse|nomouse) mouse_disabled=1;;
          *) printf 'Unknown option --%s\n' "$OPTARG" >&2; exit 1;;
@@ -426,6 +432,10 @@ EOF
         add libraries -ljack
         add cc_flags -DFEAT_JACKMIDI
       fi
+      if [ $jacktransport_enabled = 1 ]; then
+        add libraries -ljack
+        add cc_flags -DFEAT_JACKTRANSPORT
+      fi
       if [ $mouse_disabled = 1 ]; then
         add cc_flags -DFEAT_NOMOUSE
       fi
@@ -518,4 +528,3 @@ EOF
   ;;
   *) fatal "Unrecognized command $cmd";;
 esac
-
